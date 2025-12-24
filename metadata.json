@@ -1,0 +1,7 @@
+{
+  "name": "Gesture-Controlled 3D Christmas Photo Cloud",
+  "description": "A high-end 3D Christmas tree experience controlled by hand gestures. Features Matte Green, Metallic Gold, and Christmas Red aesthetics with a cinematic bloom effect. Elements transform between a cone tree shape and a dispersed photo cloud based on hand movements.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
