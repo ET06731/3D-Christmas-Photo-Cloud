@@ -16,11 +16,11 @@ const App: React.FC = () => {
     position: { x: 0.5, y: 0.5, z: 0 }
   });
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [gifts, setGifts] = useState<GiftItem[]>([]);
+  // const [gifts, setGifts] = useState<GiftItem[]>([]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isGeneratingGift, setIsGeneratingGift] = useState(false);
+  // const [isGeneratingGift, setIsGeneratingGift] = useState(false);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -79,6 +79,7 @@ const App: React.FC = () => {
     else if (type === 'switch') createOsc(440, 0.1, 0.05);
   };
 
+  /* Gift Logic Commented Out
   const generateAIGift = async (giftId: string) => {
     if (isGeneratingGift || photos.length === 0) return;
     setIsGeneratingGift(true);
@@ -131,6 +132,7 @@ const App: React.FC = () => {
       }
     }
   }, [treeState, selectedId]);
+  */
 
   const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     initAudio(); 
@@ -146,7 +148,8 @@ const App: React.FC = () => {
           const newId = Math.random().toString(36).substr(2, 9);
           setPhotos(prev => {
             const updated = [...prev, { id: newId, url: base64, texture, base64 }];
-            // Every 2nd photo adds a gift
+            // Gift logic commented out
+            /*
             if (updated.length % 2 === 0) {
               const newGift: GiftItem = {
                 id: `gift-${Math.random().toString(36).substr(2, 9)}`,
@@ -162,6 +165,7 @@ const App: React.FC = () => {
               setGifts(gPrev => [...gPrev, newGift]);
               playSound('gift');
             }
+            */
             return updated;
           });
         });
@@ -182,7 +186,8 @@ const App: React.FC = () => {
       setSelectedId(null);
     } else if (handData.gesture === 'GRAB') {
       if (now > switchCooldownRef.current) {
-        const allItems = [...photos.map(p => ({ id: p.id })), ...gifts.map(g => ({ id: g.id }))];
+        // const allItems = [...photos.map(p => ({ id: p.id })), ...gifts.map(g => ({ id: g.id }))];
+        const allItems = [...photos.map(p => ({ id: p.id }))];
         
         if (treeState === TreeState.CLOSED || treeState === TreeState.DISPERSED) {
           if (allItems.length > 0) {
@@ -216,7 +221,7 @@ const App: React.FC = () => {
     } else if (handData.gesture !== 'GRAB') {
       lastHandXRef.current = null;
     }
-  }, [handData, photos, gifts, treeState, selectedId]);
+  }, [handData, photos, /* gifts, */ treeState, selectedId]);
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden cursor-pointer" onClick={initAudio}>
@@ -225,7 +230,7 @@ const App: React.FC = () => {
           treeState={treeState} 
           handData={handData} 
           photos={photos}
-          gifts={gifts}
+          // gifts={gifts}
           selectedId={selectedId}
         />
       </div>
@@ -255,17 +260,19 @@ const App: React.FC = () => {
         </button>
       </div>
 
-      <div className="absolute top-6 left-6 z-20 w-56 h-40 rounded-2xl overflow-hidden border border-white/10 bg-black/50 backdrop-blur-md shadow-2xl">
+      <div className="absolute top-6 left-6 z-20 w-32 h-24 rounded-xl overflow-hidden border border-white/10 bg-black/50 backdrop-blur-md shadow-2xl transition-all hover:w-48 hover:h-36">
         <HandTrackerUI onHandUpdate={setHandData} onCameraReady={() => setIsCameraActive(true)} />
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-4 w-full max-w-md px-4 text-center pointer-events-none">
+        {/*
         {isGeneratingGift && (
           <div className="flex items-center gap-2 px-6 py-3 bg-red-900/40 rounded-full border border-red-500/30 animate-pulse backdrop-blur-xl">
             <div className="w-2 h-2 bg-red-400 rounded-full animate-ping" />
             <span className="text-white/90 text-xs font-light tracking-[0.2em] uppercase">AI 正在根据你的记忆挑选礼物...</span>
           </div>
         )}
+        */}
         
         <div className="bg-black/40 backdrop-blur-md px-8 py-4 rounded-full border border-white/10">
           <div className="flex gap-8 text-[10px] font-light tracking-[0.3em] text-white/40 uppercase">

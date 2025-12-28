@@ -16,11 +16,11 @@ interface Props {
   treeState: TreeState;
   handData: HandData;
   photos: PhotoItem[];
-  gifts: GiftItem[];
+  // gifts: GiftItem[];
   selectedId: string | null;
 }
 
-const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, selectedId }) => {
+const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, /* gifts, */ selectedId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const composerRef = useRef<any>(null);
@@ -46,8 +46,11 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
     scale: number;
   }[]>([]);
 
+  // Water Surface
+  const waterMeshRef = useRef<THREE.Mesh | null>(null);
+
   const photoGroupsRef = useRef<{ id: string; group: THREE.Group; photoMesh: THREE.Mesh; frameMeshes: THREE.Mesh[] }[]>([]);
-  const giftObjectsRef = useRef<{ id: string; group: THREE.Group; lid: THREE.Group; giftTag: THREE.Group; meshes: THREE.Mesh[] }[]>([]);
+  // const giftObjectsRef = useRef<{ id: string; group: THREE.Group; lid: THREE.Group; giftTag: THREE.Group; meshes: THREE.Mesh[] }[]>([]);
   
   const treeTopLightRef = useRef<THREE.PointLight | null>(null);
   const treeTopStarRef = useRef<THREE.Mesh | null>(null);
@@ -55,21 +58,22 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
   const handDataRef = useRef(handData);
   const treeStateRef = useRef(treeState);
   const selectedIdRef = useRef(selectedId);
-  const giftsRef = useRef(gifts);
+  // const giftsRef = useRef(gifts);
 
   useEffect(() => { handDataRef.current = handData; }, [handData]);
   useEffect(() => { treeStateRef.current = treeState; }, [treeState]);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
-  useEffect(() => { giftsRef.current = gifts; }, [gifts]);
+  // useEffect(() => { giftsRef.current = gifts; }, [gifts]);
 
-  const INSTANCE_COUNT = 800;
+  const INSTANCE_COUNT = 1000; 
   const SPIRAL_COUNT = 300; 
-  const AMBIENT_STAR_COUNT = 60; // 减少了星星数量，使其更显精致
+  const AMBIENT_STAR_COUNT = 60;
 
-  const GOLD = new THREE.Color(0xD4AF37);
-  const GREEN = new THREE.Color(0x1B3022);
-  const RED = new THREE.Color(0x7C1B1B);
-  const SILVER = new THREE.Color(0xE0E0E0); 
+  // 使用更加鲜艳的颜色
+  const GOLD = new THREE.Color(0xFFD700); // 亮金色
+  const GREEN = new THREE.Color(0x1B3022); 
+  const RED = new THREE.Color(0xFF3131);  // 鲜红色
+  const SILVER = new THREE.Color(0xC0C0C0); 
 
   const generateGlowTexture = () => {
     const canvas = document.createElement('canvas');
@@ -83,6 +87,7 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
     return new THREE.CanvasTexture(canvas);
   };
 
+  /*
   const createTextCanvas = (text: string, subtext: string) => {
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 256;
@@ -102,6 +107,7 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
     words.forEach((w, i) => ctx.fillText(w, 256, 150 + i * 35));
     return new THREE.CanvasTexture(canvas);
   };
+  */
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -123,11 +129,16 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
     composer.addPass(bloomPass); bloomPassRef.current = bloomPass;
     composer.addPass(new OutputPass());
 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
     const glowTexture = generateGlowTexture();
     const particleGeo = new THREE.PlaneGeometry(0.2, 0.2);
-    [GOLD, GREEN, RED].forEach(color => {
+    
+    [GOLD, GREEN, RED, SILVER].forEach(color => {
       const mat = new THREE.MeshBasicMaterial({ color, map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-      const mesh = new THREE.InstancedMesh(particleGeo, mat, Math.floor(INSTANCE_COUNT / 3));
+      const meshCount = Math.floor(INSTANCE_COUNT / 4);
+      const mesh = new THREE.InstancedMesh(particleGeo, mat, meshCount);
       scene.add(mesh); particlesRef.current.push(mesh);
     });
 
@@ -136,11 +147,31 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
       currentPosRef.current.push(pos); targetsRef.current.push({ pos: pos.clone(), color: GOLD });
     }
 
-    const spiralMesh = new THREE.InstancedMesh(particleGeo, new THREE.MeshBasicMaterial({ color: SILVER, map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), SPIRAL_COUNT);
+    const spiralMesh = new THREE.InstancedMesh(particleGeo, new THREE.MeshBasicMaterial({ color: 0xEEFFFF, map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), SPIRAL_COUNT);
     scene.add(spiralMesh); spiralMeshRef.current = spiralMesh;
     for (let i = 0; i < SPIRAL_COUNT; i++) {
       const pos = new THREE.Vector3(0,0,0); spiralCurrentPosRef.current.push(pos); spiralTargetsRef.current.push(pos.clone());
     }
+
+    // Water Surface Setup
+    const waterGeo = new THREE.CircleGeometry(10, 64);
+    const waterMat = new THREE.MeshPhysicalMaterial({
+      color: 0x003366,
+      transparent: true,
+      opacity: 0.6,
+      transmission: 0.8,
+      roughness: 0.1,
+      metalness: 0.9,
+      reflectivity: 1,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1,
+      side: THREE.DoubleSide
+    });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -6.5;
+    scene.add(water);
+    waterMeshRef.current = water;
 
     // Ambient Star Setup
     const starShape = new THREE.Shape();
@@ -165,7 +196,7 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
       });
     }
 
-    const treeTopLight = new THREE.PointLight(0xFFD700, 0, 30); treeTopLight.position.set(0, 8.5, 0);
+    const treeTopLight = new THREE.PointLight(0xFFD700, 0, 40); treeTopLight.position.set(0, 6.5, 0);
     scene.add(treeTopLight); treeTopLightRef.current = treeTopLight;
 
     const largeStarShape = new THREE.Shape();
@@ -174,7 +205,7 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
       if (i === 0) largeStarShape.moveTo(Math.cos(a)*r, Math.sin(a)*r); else largeStarShape.lineTo(Math.cos(a)*r, Math.sin(a)*r);
     }
     const treeTopStar = new THREE.Mesh(new THREE.ExtrudeGeometry(largeStarShape, { depth: 0.2 }), new THREE.MeshBasicMaterial({ color: 0xFFFFEE }));
-    treeTopStar.position.set(0, 8, 0); treeTopStar.scale.set(0.6, 0.6, 0.6);
+    treeTopStar.position.set(0, 6, 0); treeTopStar.scale.set(0.6, 0.6, 0.6);
     scene.add(treeTopStar); treeTopStarRef.current = treeTopStar;
 
     let time = 0;
@@ -184,7 +215,19 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
       const state = treeStateRef.current;
       const hData = handDataRef.current;
       const selId = selectedIdRef.current;
-      const currGifts = giftsRef.current;
+      // const currGifts = giftsRef.current;
+
+      if (waterMeshRef.current) {
+        const vertices = waterMeshRef.current.geometry.attributes.position;
+        for (let i = 0; i < vertices.count; i++) {
+          const x = vertices.getX(i);
+          const y = vertices.getY(i);
+          const dist = Math.sqrt(x * x + y * y);
+          const ripple = Math.sin(dist * 1.5 - time * 3.0) * 0.1;
+          vertices.setZ(i, ripple);
+        }
+        vertices.needsUpdate = true;
+      }
 
       if (bloomPassRef.current) {
         if (state === TreeState.ZOOMED) {
@@ -200,7 +243,7 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
 
       if (treeTopLightRef.current && treeTopStarRef.current) {
         if (state === TreeState.CLOSED) {
-          treeTopLightRef.current.intensity += (3.5 + Math.sin(time*2)*1.5 - treeTopLightRef.current.intensity) * 0.1;
+          treeTopLightRef.current.intensity += (4.5 + Math.sin(time*2)*2.0 - treeTopLightRef.current.intensity) * 0.1;
           treeTopStarRef.current.rotation.y += 0.02;
           treeTopStarRef.current.scale.setScalar(0.7 + Math.sin(time*3)*0.05);
         } else {
@@ -209,82 +252,26 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
         }
       }
 
-      // 礼盒材质与动画
+      /* Gift Loop Commented Out
       giftObjectsRef.current.forEach((obj, i) => {
-        const gift = currGifts.find(g => g.id === obj.id);
-        if (!gift) return;
-
-        let targetOpacity = 1.0;
-        if (state === TreeState.ZOOMED) {
-          targetOpacity = obj.id === selId ? 1.0 : 0.0;
-        }
-
-        obj.meshes.forEach(m => {
-          if (m.material instanceof THREE.Material) {
-            m.material.opacity = THREE.MathUtils.lerp(m.material.opacity, targetOpacity, 0.08);
-          }
-        });
-
-        if (state === TreeState.ZOOMED && selId === gift.id) {
-          const camPos = cameraRef.current!.position.clone();
-          const dir = cameraRef.current!.getWorldDirection(new THREE.Vector3());
-          obj.group.position.lerp(camPos.add(dir.multiplyScalar(6)), 0.15);
-          obj.group.scale.lerp(new THREE.Vector3(4, 4, 4), 0.1);
-          obj.group.lookAt(cameraRef.current!.position);
-          obj.group.visible = true;
-          obj.group.renderOrder = 10;
-        } else if (state === TreeState.CLOSED) {
-          obj.group.position.lerp(gift.position, 0.1);
-          obj.group.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
-          obj.group.lookAt(0, gift.position.y, 0);
-          obj.group.visible = true;
-          obj.group.renderOrder = 0;
-        } else if (state === TreeState.DISPERSED) {
-          const orbitR = 12 + Math.sin(time + i)*2;
-          const a = (i * 1.5) + time * 0.2;
-          const target = new THREE.Vector3(Math.cos(a)*orbitR, Math.sin(a*0.3)*5, Math.sin(a)*orbitR);
-          obj.group.position.lerp(target, 0.05);
-          obj.group.scale.lerp(new THREE.Vector3(1.1, 1.1, 1.1), 0.1);
-          obj.group.lookAt(cameraRef.current!.position);
-          obj.group.visible = true;
-          obj.group.renderOrder = 0;
-        } else if (state === TreeState.ZOOMED && selId !== gift.id) {
-          if (obj.meshes[0].material.opacity < 0.01) {
-            obj.group.visible = false;
-          } else {
-            obj.group.scale.lerp(new THREE.Vector3(3.5, 3.5, 3.5), 0.05);
-            obj.group.renderOrder = 5;
-          }
-        }
-
-        if (gift.isOpen) {
-          obj.lid.position.y += (3 - obj.lid.position.y) * 0.05;
-          obj.lid.rotation.x += 0.02; obj.lid.rotation.z += 0.03;
-          obj.lid.scale.multiplyScalar(0.98);
-          if (obj.lid.scale.x < 0.1) obj.lid.visible = false;
-          
-          if (gift.name && !obj.giftTag.visible) {
-            obj.giftTag.visible = true;
-            const tex = createTextCanvas(gift.name, gift.blessing);
-            (obj.giftTag.children[0] as THREE.Mesh).material = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
-          }
-          if (obj.giftTag.visible) {
-            obj.giftTag.position.y += (1.8 - obj.giftTag.position.y) * 0.1;
-            obj.giftTag.scale.lerp(new THREE.Vector3(1.0, 1.0, 1.0), 0.1);
-            obj.giftTag.lookAt(cameraRef.current!.position);
-          }
-        }
+        // ... (existing commented code)
       });
+      */
 
       if (cameraRef.current) {
-        cameraRef.current.position.x += (hData.rotation.y * 30 - cameraRef.current.position.x) * 0.04;
-        cameraRef.current.position.y += (hData.rotation.x * 25 - cameraRef.current.position.y) * 0.04;
-        cameraRef.current.lookAt(0, state === TreeState.CLOSED ? 1 : 0, 0);
+        // Increased multipliers for easier movement (sensitivity)
+        const targetX = hData.rotation.y * 55;
+        const targetY = hData.rotation.x * 40;
+        
+        // Increased lerp factor for smoother, less sluggish response
+        cameraRef.current.position.x += (targetX - cameraRef.current.position.x) * 0.08;
+        cameraRef.current.position.y += (targetY - cameraRef.current.position.y) * 0.08;
+        
+        cameraRef.current.lookAt(0, state === TreeState.CLOSED ? 0 : 0, 0);
       }
 
       const camQ = cameraRef.current!.quaternion;
 
-      // Update Ambient Stars
       if (ambientStarsRef.current) {
         const dummy = new THREE.Object3D();
         ambientStarDataRef.current.forEach((star, i) => {
@@ -292,7 +279,6 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
           star.rot += star.rotSpeed;
           
           dummy.position.copy(star.pos);
-          // Gently float
           dummy.position.y += Math.sin(time * 0.5 + i) * 0.05;
           dummy.quaternion.copy(camQ);
           dummy.rotateZ(star.rot);
@@ -304,18 +290,22 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
           ambientStarsRef.current!.setMatrixAt(i, dummy.matrix);
         });
         ambientStarsRef.current.instanceMatrix.needsUpdate = true;
-        // Fade out stars when zoomed
         (ambientStarsRef.current.material as THREE.Material).opacity = THREE.MathUtils.lerp((ambientStarsRef.current.material as THREE.Material).opacity, state === TreeState.ZOOMED ? 0.2 : 1.0, 0.1);
       }
 
       particlesRef.current.forEach((mesh, mIdx) => {
+        // mIdx: 0=GOLD, 1=GREEN, 2=RED, 3=SILVER
+        const isGoldOrRed = mIdx === 0 || mIdx === 2;
+        const scaleBoost = isGoldOrRed ? 1.5 : 1.0;
+
         for (let i = 0; i < mesh.count; i++) {
           const idx = mIdx * mesh.count + i;
           const curr = currentPosRef.current[idx];
           curr.lerp(targetsRef.current[idx].pos, 0.08);
           const dummy = new THREE.Object3D();
           dummy.position.copy(curr); dummy.quaternion.copy(camQ);
-          dummy.scale.setScalar(0.8 + Math.sin(time*4 + idx)*0.2);
+          // 为金红色粒子提供额外的缩放动画和基础大小
+          dummy.scale.setScalar(scaleBoost * (0.8 + Math.sin(time*4 + idx)*0.2));
           dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
         }
         mesh.instanceMatrix.needsUpdate = true;
@@ -324,8 +314,8 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
       if (spiralMeshRef.current) {
         for (let i = 0; i < SPIRAL_COUNT; i++) {
           const progress = i / SPIRAL_COUNT;
-          const h = progress * 13 - 6;
-          const r = (6.5 - h) * 0.5 + 0.5;
+          const h = progress * 10 - 5;
+          const r = (5.5 - h) * 0.4 + 0.4;
           const a = progress * Math.PI * 10 - time;
           const target = state === TreeState.CLOSED ? new THREE.Vector3(Math.cos(a)*r, h, Math.sin(a)*r) : new THREE.Vector3(0,0,0).addScaledVector(currentPosRef.current[i % INSTANCE_COUNT], 1.5);
           spiralCurrentPosRef.current[i].lerp(target, 0.05);
@@ -355,11 +345,11 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
         });
 
         if (st === TreeState.CLOSED) {
-          const h = (i / photoGroupsRef.current.length) * 11 - 5;
-          const r = (6 - h) * 0.5 + 1;
+          const h = (i / photoGroupsRef.current.length) * 8 - 4;
+          const r = (4.5 - h) * 0.45 + 0.8;
           const a = (i * 2.5) + t * 0.3;
           item.group.position.lerp(new THREE.Vector3(Math.cos(a)*r, h, Math.sin(a)*r), 0.1);
-          item.group.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+          item.group.scale.lerp(new THREE.Vector3(0.6, 0.6, 0.6), 0.1); // Reduced scale for photos in tree mode
           item.group.lookAt(0, h, 0);
           item.group.visible = true;
           item.group.renderOrder = 0;
@@ -402,45 +392,11 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
     return () => { window.removeEventListener('resize', handleResize); containerRef.current?.removeChild(renderer.domElement); };
   }, []);
 
+  /* Gift Creation Effect Commented Out
   useEffect(() => {
-    if (!sceneRef.current) return;
-    gifts.forEach(gift => {
-      if (!giftObjectsRef.current.find(o => o.id === gift.id)) {
-        const group = new THREE.Group();
-        const meshes: THREE.Mesh[] = [];
-
-        const baseMat = new THREE.MeshPhongMaterial({ 
-          color: Math.random() > 0.5 ? 0x800000 : 0x004d00,
-          transparent: true,
-          opacity: 1.0
-        });
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), baseMat);
-        group.add(base);
-        meshes.push(base);
-
-        const lidGroup = new THREE.Group();
-        const lidMat = new THREE.MeshPhongMaterial({ color: 0x8B4513, transparent: true, opacity: 1.0 });
-        const lid = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.9), lidMat);
-        lidGroup.add(lid); lidGroup.position.y = 0.45;
-        group.add(lidGroup);
-        meshes.push(lid);
-
-        const tag = new THREE.Group();
-        const tagPlane = new THREE.Mesh(new THREE.PlaneGeometry(2, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 1 }));
-        tag.add(tagPlane);
-        tag.visible = false; group.add(tag);
-        
-        group.position.copy(gift.position);
-        sceneRef.current!.add(group);
-        giftObjectsRef.current.push({ id: gift.id, group, lid: lidGroup, giftTag: tag, meshes });
-      }
-    });
-    giftObjectsRef.current = giftObjectsRef.current.filter(obj => {
-      const exists = gifts.find(g => g.id === obj.id);
-      if (!exists) sceneRef.current?.remove(obj.group);
-      return !!exists;
-    });
+    // ... (existing commented code)
   }, [gifts]);
+  */
 
   useEffect(() => {
     if (!sceneRef.current) return;
@@ -473,22 +429,26 @@ const SceneContainer: React.FC<Props> = ({ treeState, handData, photos, gifts, s
     const state = treeStateRef.current;
     if (state === TreeState.CLOSED) {
       targetsRef.current.forEach(t => {
-        const h = Math.random() * 14 - 7; const maxR = (7.5 - h) * 0.5; const r = maxR * (0.6 + 0.4 * Math.random());
+        const h = Math.random() * 10 - 5; const maxR = (5.5 - h) * 0.45; const r = maxR * (0.6 + 0.4 * Math.random());
         const theta = Math.random() * Math.PI * 2; t.pos.set(Math.cos(theta)*r, h, Math.sin(theta)*r);
       });
-      // Move ambient stars to tree shell
       ambientStarDataRef.current.forEach(star => {
-        const h = Math.random() * 16 - 8;
-        const r = ((8.5 - h) * 0.5 + 1.5) * (0.8 + Math.random() * 0.4);
+        const h = Math.random() * 12 - 6;
+        const r = ((6.5 - h) * 0.45 + 1.2) * (0.8 + Math.random() * 0.4);
         const theta = Math.random() * Math.PI * 2;
         star.targetPos.set(Math.cos(theta)*r, h, Math.sin(theta)*r);
       });
+      if (waterMeshRef.current) {
+        waterMeshRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+      }
     } else {
       targetsRef.current.forEach(t => t.pos.set((Math.random()-0.5)*45, (Math.random()-0.5)*45, (Math.random()-0.5)*25));
-      // Disperse ambient stars
       ambientStarDataRef.current.forEach(star => {
         star.targetPos.set((Math.random()-0.5)*40, (Math.random()-0.5)*40, (Math.random()-0.5)*30);
       });
+      if (waterMeshRef.current) {
+        waterMeshRef.current.scale.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+      }
     }
   }, [treeState]);
 
